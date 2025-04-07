@@ -67,6 +67,8 @@ interface TimeSlot {
   id: number;
   startTime: string;
   endTime: string;
+  interval: number;
+  isBaseSlot: number;
 }
 
 // Schemas de formulário
@@ -79,6 +81,8 @@ const activityTypeSchema = z.object({
 const timeSlotSchema = z.object({
   startTime: z.string().min(5, "Hora inicial deve estar no formato HH:MM"),
   endTime: z.string().min(5, "Hora final deve estar no formato HH:MM"),
+  interval: z.number().default(30),
+  isBaseSlot: z.number().default(1)
 });
 
 type ActivityTypeFormValues = z.infer<typeof activityTypeSchema>;
@@ -110,12 +114,12 @@ export default function Settings() {
   const [timeSlotModalOpen, setTimeSlotModalOpen] = useState(false);
   const [professionalModalOpen, setProfessionalModalOpen] = useState(false);
   const [editingProfessionalId, setEditingProfessionalId] = useState<number | null>(null);
-  
+
   // Verificar se o acesso é via link compartilhado e redirecionar se for
   useEffect(() => {
     const url = new URL(window.location.href);
     const hasQueryParams = url.search.length > 0;
-    
+
     if (hasQueryParams) {
       // Notificar o usuário e redirecionar para a página de escalas mantendo os parâmetros
       toast({
@@ -123,12 +127,12 @@ export default function Settings() {
         description: "Links compartilhados não permitem acesso às configurações do sistema.",
         variant: "destructive",
       });
-      
+
       // Redirecionar para a página de escalas mantendo os parâmetros
       setLocation(`/schedule${url.search}`);
     }
   }, []);
-  
+
   // Query para buscar tipos de atividades
   const { 
     data: activityTypes, 
@@ -138,7 +142,7 @@ export default function Settings() {
     queryKey: ['/api/activity-types'],
     queryFn: ({ queryKey }) => fetch(queryKey[0] as string).then(res => res.json()),
   });
-  
+
   // Query para buscar horários
   const { 
     data: timeSlots, 
@@ -148,7 +152,7 @@ export default function Settings() {
     queryKey: ['/api/time-slots'],
     queryFn: ({ queryKey }) => fetch(queryKey[0] as string).then(res => res.json()),
   });
-  
+
   // Formulário para tipos de atividades
   const activityForm = useForm<ActivityTypeFormValues>({
     resolver: zodResolver(activityTypeSchema),
@@ -158,16 +162,18 @@ export default function Settings() {
       color: "#3b82f6" // Azul por padrão
     }
   });
-  
+
   // Formulário para horários
   const timeSlotForm = useForm<TimeSlotFormValues>({
     resolver: zodResolver(timeSlotSchema),
     defaultValues: {
       startTime: "",
-      endTime: ""
-    }
+      endTime: "",
+      interval: 30,
+      isBaseSlot: 1
+    },
   });
-  
+
   // Formulário para professores
   const professionalForm = useForm<ProfessionalFormValues>({
     resolver: zodResolver(professionalSchema),
@@ -177,7 +183,7 @@ export default function Settings() {
       active: 1
     }
   });
-  
+
   // Query para buscar professores
   const { 
     data: professionals, 
@@ -187,7 +193,7 @@ export default function Settings() {
     queryKey: ['/api/professionals'],
     queryFn: ({ queryKey }) => fetch(queryKey[0] as string).then(res => res.json()),
   });
-  
+
   // Mutação para criar/atualizar tipo de atividade
   const { 
     mutate: saveActivityType, 
@@ -208,12 +214,12 @@ export default function Settings() {
           : "Tipo de atividade criado com sucesso.",
         variant: "default",
       });
-      
+
       // Fechar modal e resetar form
       setActivityModalOpen(false);
       activityForm.reset();
       setEditingActivityId(null);
-      
+
       // Recarregar dados
       queryClient.invalidateQueries({ queryKey: ['/api/activity-types'] });
     },
@@ -225,7 +231,7 @@ export default function Settings() {
       });
     }
   });
-  
+
   // Mutação para excluir tipo de atividade
   const { 
     mutate: deleteActivityType 
@@ -239,7 +245,7 @@ export default function Settings() {
         description: "Tipo de atividade excluído com sucesso.",
         variant: "default",
       });
-      
+
       // Recarregar dados
       queryClient.invalidateQueries({ queryKey: ['/api/activity-types'] });
     },
@@ -251,7 +257,7 @@ export default function Settings() {
       });
     }
   });
-  
+
   // Mutação para criar/atualizar horário
   const { 
     mutate: saveTimeSlot, 
@@ -266,11 +272,11 @@ export default function Settings() {
         description: "Horário adicionado com sucesso.",
         variant: "default",
       });
-      
+
       // Fechar modal e resetar form
       setTimeSlotModalOpen(false);
       timeSlotForm.reset();
-      
+
       // Recarregar dados
       queryClient.invalidateQueries({ queryKey: ['/api/time-slots'] });
     },
@@ -282,7 +288,7 @@ export default function Settings() {
       });
     }
   });
-  
+
   // Mutação para excluir horário
   const { 
     mutate: deleteTimeSlot 
@@ -296,7 +302,7 @@ export default function Settings() {
         description: "Horário excluído com sucesso.",
         variant: "default",
       });
-      
+
       // Recarregar dados
       queryClient.invalidateQueries({ queryKey: ['/api/time-slots'] });
     },
@@ -308,7 +314,7 @@ export default function Settings() {
       });
     }
   });
-  
+
   // Função para abrir o modal de edição de atividade
   const handleEditActivity = (activity: ActivityType) => {
     setEditingActivityId(activity.id);
@@ -319,7 +325,7 @@ export default function Settings() {
     });
     setActivityModalOpen(true);
   };
-  
+
   // Função para abrir o modal de nova atividade
   const handleNewActivity = () => {
     setEditingActivityId(null);
@@ -330,7 +336,7 @@ export default function Settings() {
     });
     setActivityModalOpen(true);
   };
-  
+
   // Função para gerar automaticamente um código a partir do nome
   const generateCodeFromName = (name: string): string => {
     return name
@@ -340,26 +346,26 @@ export default function Settings() {
       .replace(/[^a-z0-9]+/g, "_") // Substitui caracteres não alfanuméricos por _
       .replace(/^_+|_+$/g, ""); // Remove underscores do início e fim
   };
-  
+
   // Função para salvar o tipo de atividade
   const onSubmitActivityType = (data: ActivityTypeFormValues) => {
     // Caso o código esteja vazio, gera um código com base no nome
     if (!data.code.trim()) {
       data.code = generateCodeFromName(data.name);
     }
-    
+
     if (editingActivityId) {
       saveActivityType({ ...data, id: editingActivityId });
     } else {
       saveActivityType(data);
     }
   };
-  
+
   // Função para salvar o horário
   const onSubmitTimeSlot = (data: TimeSlotFormValues) => {
     saveTimeSlot(data);
   };
-  
+
   // Renderização da tabela de tipos de atividades
   const renderActivityTypesTable = () => {
     if (isLoadingActivityTypes) {
@@ -370,7 +376,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     if (isActivityTypesError) {
       return (
         <div className="text-center p-6 text-red-500">
@@ -378,7 +384,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     if (!activityTypes || activityTypes.length === 0) {
       return (
         <div className="text-center p-6 text-gray-500">
@@ -386,7 +392,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     return (
       <Table>
         <TableHeader>
@@ -436,7 +442,7 @@ export default function Settings() {
       </Table>
     );
   };
-  
+
   // Renderização da tabela de horários
   const renderTimeSlotsTable = () => {
     if (isLoadingTimeSlots) {
@@ -447,7 +453,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     if (isTimeSlotsError) {
       return (
         <div className="text-center p-6 text-red-500">
@@ -455,7 +461,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     if (!timeSlots || timeSlots.length === 0) {
       return (
         <div className="text-center p-6 text-gray-500">
@@ -463,7 +469,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     return (
       <Table>
         <TableHeader>
@@ -499,7 +505,7 @@ export default function Settings() {
       </Table>
     );
   };
-  
+
   // Função para renderizar a tabela de professores
   const renderProfessionalsTable = () => {
     if (isLoadingProfessionals) {
@@ -510,7 +516,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     if (isProfessionalsError) {
       return (
         <div className="text-center p-6 text-red-500">
@@ -518,7 +524,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     if (!professionals || professionals.length === 0) {
       return (
         <div className="text-center p-6 text-gray-500">
@@ -526,7 +532,7 @@ export default function Settings() {
         </div>
       );
     }
-    
+
     return (
       <Table>
         <TableHeader>
@@ -574,7 +580,7 @@ export default function Settings() {
       </Table>
     );
   };
-  
+
   // Mutação para criar/atualizar professor
   const { 
     mutate: saveProfessional, 
@@ -595,12 +601,12 @@ export default function Settings() {
           : "Professor criado com sucesso.",
         variant: "default",
       });
-      
+
       // Fechar modal e resetar form
       setProfessionalModalOpen(false);
       professionalForm.reset();
       setEditingProfessionalId(null);
-      
+
       // Recarregar dados
       queryClient.invalidateQueries({ queryKey: ['/api/professionals'] });
     },
@@ -612,7 +618,7 @@ export default function Settings() {
       });
     }
   });
-  
+
   // Mutação para excluir professor
   const { 
     mutate: deleteProfessional 
@@ -626,7 +632,7 @@ export default function Settings() {
         description: "Professor excluído com sucesso.",
         variant: "default",
       });
-      
+
       // Recarregar dados
       queryClient.invalidateQueries({ queryKey: ['/api/professionals'] });
     },
@@ -638,7 +644,7 @@ export default function Settings() {
       });
     }
   });
-  
+
   // Função para abrir o modal de edição de professor
   const handleEditProfessional = (professional: Professional) => {
     setEditingProfessionalId(professional.id);
@@ -649,7 +655,7 @@ export default function Settings() {
     });
     setProfessionalModalOpen(true);
   };
-  
+
   // Função para abrir o modal de novo professor
   const handleNewProfessional = () => {
     setEditingProfessionalId(null);
@@ -660,7 +666,7 @@ export default function Settings() {
     });
     setProfessionalModalOpen(true);
   };
-  
+
   // Função para salvar o professor
   const onSubmitProfessional = (data: ProfessionalFormValues) => {
     if (editingProfessionalId) {
@@ -669,7 +675,7 @@ export default function Settings() {
       saveProfessional(data);
     }
   };
-  
+
   // Função para calcular a duração entre dois horários
   const calculateDuration = (startTime: string, endTime: string) => {
     try {
@@ -677,7 +683,7 @@ export default function Settings() {
       const end = new Date(`2023-01-01T${endTime}`);
       const durationMs = end.getTime() - start.getTime();
       const minutes = Math.floor(durationMs / 60000);
-      
+
       if (minutes < 60) {
         return `${minutes} minutos`;
       } else {
@@ -691,23 +697,44 @@ export default function Settings() {
       return "Formato inválido";
     }
   };
-  
+
+  // Função para abrir o modal de novo horário
+  const handleNewTimeSlot = () => {
+    // Se houver horários cadastrados, pega o último
+    if (timeSlots && timeSlots.length > 0) {
+      const lastTimeSlot = timeSlots[timeSlots.length - 1];
+
+      // Preenche o horário inicial com o horário final do último slot
+      timeSlotForm.setValue("startTime", lastTimeSlot.endTime);
+
+      // Calcula o horário final (horário inicial + 30 minutos)
+      const startTime = new Date(`2000-01-01T${lastTimeSlot.endTime}`);
+      startTime.setMinutes(startTime.getMinutes() + 30);
+      const endTime = startTime.toTimeString().slice(0, 5);
+
+      timeSlotForm.setValue("endTime", endTime);
+    }
+
+    setTimeSlotModalOpen(true);
+  };
+
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Header />
-      
+
       <main className="flex-grow mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Configurações do Sistema</h1>
         </div>
-        
+
         <Tabs defaultValue="activities" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="activities">Tipos de Atividades</TabsTrigger>
             <TabsTrigger value="timeSlots">Horários</TabsTrigger>
             <TabsTrigger value="professionals">Professores</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="activities">
             <Card>
               <CardHeader>
@@ -728,28 +755,28 @@ export default function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="timeSlots">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Gerenciar Horários</CardTitle>
-                    <CardDescription>
-                      Configure os horários padrão disponíveis para a escala.
-                    </CardDescription>
-                  </div>
-                  <Button onClick={() => setTimeSlotModalOpen(true)}>
-                    <PlusCircle className="h-4 w-4 mr-2" /> Adicionar
-                  </Button>
+                <div>
+                  <CardTitle>Gerenciar Horários</CardTitle>
+                  <CardDescription>
+                    Configure os horários padrão disponíveis para a escala.
+                  </CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
                 {renderTimeSlotsTable()}
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleNewTimeSlot}>
+                    <PlusCircle className="h-4 w-4 mr-2" /> Adicionar
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="professionals">
             <Card>
               <CardHeader>
@@ -771,7 +798,7 @@ export default function Settings() {
             </Card>
           </TabsContent>
         </Tabs>
-        
+
         {/* Modal para adicionar/editar tipo de atividade */}
         <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
           <DialogContent>
@@ -780,7 +807,7 @@ export default function Settings() {
                 {editingActivityId ? "Editar Tipo de Atividade" : "Novo Tipo de Atividade"}
               </DialogTitle>
             </DialogHeader>
-            
+
             <Form {...activityForm}>
               <form onSubmit={activityForm.handleSubmit(onSubmitActivityType)} className="space-y-6">
                 <FormField
@@ -808,7 +835,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={activityForm.control}
                   name="code"
@@ -830,7 +857,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={activityForm.control}
                   name="color"
@@ -859,7 +886,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setActivityModalOpen(false)}>
                     Cancelar
@@ -882,7 +909,7 @@ export default function Settings() {
             </Form>
           </DialogContent>
         </Dialog>
-        
+
         {/* Modal para adicionar/editar professor */}
         <Dialog open={professionalModalOpen} onOpenChange={setProfessionalModalOpen}>
           <DialogContent>
@@ -891,7 +918,7 @@ export default function Settings() {
                 {editingProfessionalId ? "Editar Professor" : "Novo Professor"}
               </DialogTitle>
             </DialogHeader>
-            
+
             <Form {...professionalForm}>
               <form onSubmit={professionalForm.handleSubmit(onSubmitProfessional)} className="space-y-6">
                 <FormField
@@ -910,7 +937,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={professionalForm.control}
                   name="initials"
@@ -927,7 +954,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={professionalForm.control}
                   name="active"
@@ -952,7 +979,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setProfessionalModalOpen(false)}>
                     Cancelar
@@ -975,14 +1002,14 @@ export default function Settings() {
             </Form>
           </DialogContent>
         </Dialog>
-        
+
         {/* Modal para adicionar horário */}
         <Dialog open={timeSlotModalOpen} onOpenChange={setTimeSlotModalOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Novo Horário</DialogTitle>
             </DialogHeader>
-            
+
             <Form {...timeSlotForm}>
               <form onSubmit={timeSlotForm.handleSubmit(onSubmitTimeSlot)} className="space-y-6">
                 <div className="flex gap-4">
@@ -1002,7 +1029,7 @@ export default function Settings() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={timeSlotForm.control}
                     name="endTime"
@@ -1020,7 +1047,7 @@ export default function Settings() {
                     )}
                   />
                 </div>
-                
+
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setTimeSlotModalOpen(false)}>
                     Cancelar
@@ -1044,7 +1071,7 @@ export default function Settings() {
           </DialogContent>
         </Dialog>
       </main>
-      
+
       <Footer />
     </div>
   );
